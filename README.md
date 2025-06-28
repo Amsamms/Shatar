@@ -160,7 +160,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 If you encounter any issues or have questions:
-- Open an [Issue](https://github.com/yourusername/shatar-arabic-poetry/issues)
+- Open an [Issue](https://github.com/amsamms/shatar-arabic-poetry/issues)
 - Contact: [ahmedsabri85@gmail.com]
 
 ---
