@@ -5,9 +5,23 @@ import os
 
 # Page configuration
 st.set_page_config(
-    page_title="مولد الشعر العربي",
+    page_title="مولد الشعر العربي - Shatar",
     page_icon="🎭",
-    layout="centered"
+    layout="centered",
+    initial_sidebar_state="collapsed",
+    menu_items={
+        'Get Help': 'https://github.com/yourusername/shatar-arabic-poetry',
+        'Report a bug': 'https://github.com/yourusername/shatar-arabic-poetry/issues',
+        'About': """
+        # Shatar - Arabic Poetry Generator
+        Generate beautiful Arabic poetry using AI
+        
+        **Features:**
+        - 8 Classical Arabic meters
+        - Anthropic Claude & OpenAI GPT support
+        - Download generated poems
+        """
+    }
 )
 
 class ArabicPoetryGenerator:
@@ -100,10 +114,7 @@ try:
     
     if anthropic_key or openai_key:
         api_keys_available = True
-        if anthropic_key:
-            st.success(f"✅ Anthropic API Key loaded: {anthropic_key[:10]}...{anthropic_key[-10:]}")
-        if openai_key:
-            st.success(f"✅ OpenAI API Key loaded: {openai_key[:10]}...{openai_key[-10:]}")
+        # Production: Clean interface - no API key status messages
     else:
         st.warning("⚠️ لم يتم العثور على مفاتيح API في الإعدادات")
         
