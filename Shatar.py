@@ -1,6 +1,6 @@
 import streamlit as st
-import requests
-import json
+import anthropic
+import openai
 import os
 
 # Page configuration
@@ -11,14 +11,14 @@ st.set_page_config(
 )
 
 class ArabicPoetryGenerator:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.base_url = "https://api.anthropic.com/v1/messages"
-        self.headers = {
-            "Content-Type": "application/json",
-            "x-api-key": self.api_key,
-            "anthropic-version": "2023-06-01"
-        }
+    def __init__(self, anthropic_key: str = None, openai_key: str = None):
+        self.anthropic_client = None
+        self.openai_client = None
+        
+        if anthropic_key:
+            self.anthropic_client = anthropic.Anthropic(api_key=anthropic_key)
+        if openai_key:
+            self.openai_client = openai.OpenAI(api_key=openai_key)
         
         self.meters = {
             "البسيط": "مُسْتَفْعِلُنْ فَاعِلُنْ مُسْتَفْعِلُنْ فَعِلُنْ",
@@ -31,7 +31,7 @@ class ArabicPoetryGenerator:
             "الرمل": "فَاعِلاتُنْ فَاعِلاتُنْ فَاعِلاتُنْ"
         }
 
-    def generate_poem(self, theme: str, meter: str = "البسيط", num_verses: int = 4, style: str = "classical"):
+    def generate_poem(self, theme: str, meter: str = "البسيط", num_verses: int = 4, style: str = "classical", api_provider: str = "anthropic"):
         if meter not in self.meters:
             meter = "البسيط"
         
@@ -53,28 +53,34 @@ class ArabicPoetryGenerator:
 
 القصيدة:"""
 
-        payload = {
-            "model": "claude-3-5-sonnet-20241022",
-            "max_tokens": 1000,
-            "temperature": 0.8,
-            "messages": [{"role": "user", "content": prompt}]
-        }
-
         try:
-            response = requests.post(
-                self.base_url, 
-                headers=self.headers, 
-                json=payload, 
-                timeout=30
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                poem_text = result['content'][0]['text'].strip()
+            if api_provider == "anthropic" and self.anthropic_client:
+                response = self.anthropic_client.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=1000,
+                    temperature=0.8,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                poem_text = response.content[0].text.strip()
                 return True, poem_text
+                
+            elif api_provider == "openai" and self.openai_client:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o",  # Using GPT-4o (latest model)
+                    max_tokens=1000,
+                    temperature=0.8,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                poem_text = response.choices[0].message.content.strip()
+                return True, poem_text
+            
             else:
-                return False, f"خطأ في إنشاء القصيدة: {response.status_code}"
-
+                return False, f"خطأ: {api_provider} غير متاح أو لم يتم تكوينه"
+            
+        except anthropic.APIError as e:
+            return False, f"خطأ في Anthropic API: {str(e)}"
+        except openai.APIError as e:
+            return False, f"خطأ في OpenAI API: {str(e)}"
         except Exception as e:
             return False, f"خطأ: {str(e)}"
 
@@ -82,27 +88,42 @@ class ArabicPoetryGenerator:
 st.title("🎭 مولد الشعر العربي")
 st.markdown("---")
 
-# Get API key from Streamlit secrets or environment variables
+# Get API keys from Streamlit secrets or environment variables
+anthropic_key = None
+openai_key = None
+api_keys_available = False
+
 try:
     # Try Streamlit secrets first
-    api_key = st.secrets["ANTHROPIC_API_KEY"]
-    api_key_available = True
-except (KeyError, FileNotFoundError):
+    anthropic_key = st.secrets.get("ANTHROPIC_API_KEY")
+    openai_key = st.secrets.get("OPENAI_API_KEY")
+    
+    if anthropic_key or openai_key:
+        api_keys_available = True
+        if anthropic_key:
+            st.success(f"✅ Anthropic API Key loaded: {anthropic_key[:10]}...{anthropic_key[-10:]}")
+        if openai_key:
+            st.success(f"✅ OpenAI API Key loaded: {openai_key[:10]}...{openai_key[-10:]}")
+    else:
+        st.warning("⚠️ لم يتم العثور على مفاتيح API في الإعدادات")
+        
+except Exception as e:
     try:
-        # Try environment variable
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if api_key:
-            api_key_available = True
+        # Try environment variables
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+        
+        if anthropic_key or openai_key:
+            api_keys_available = True
         else:
-            api_key_available = False
-            st.error("❌ لم يتم العثور على مفتاح API. يرجى إعداد ANTHROPIC_API_KEY في المتغيرات البيئية.")
+            api_keys_available = False
+            st.error("❌ لم يتم العثور على مفاتيح API. يرجى إعداد ANTHROPIC_API_KEY أو OPENAI_API_KEY")
     except:
-        api_key = None
-        api_key_available = False
-        st.error("❌ خطأ في تحميل مفتاح API.")
+        api_keys_available = False
+        st.error("❌ خطأ في تحميل مفاتيح API.")
 
 # Main interface
-if api_key_available:
+if api_keys_available:
     # User input
     user_prompt = st.text_area(
         "اكتب موضوع القصيدة:",
@@ -111,7 +132,7 @@ if api_key_available:
     )
     
     # Options in columns
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         meter = st.selectbox(
@@ -134,21 +155,40 @@ if api_key_available:
             value=4
         )
     
+    with col4:
+        # API Provider selection
+        available_providers = []
+        if anthropic_key:
+            available_providers.append("anthropic")
+        if openai_key:
+            available_providers.append("openai")
+            
+        api_provider = st.selectbox(
+            "مزود الخدمة:",
+            available_providers,
+            format_func=lambda x: "Anthropic (Claude)" if x == "anthropic" else "OpenAI (GPT)"
+        )
+    
     # Generate button
     if st.button("🎨 أنشئ القصيدة", type="primary", use_container_width=True):
         if user_prompt.strip():
             with st.spinner("جاري إنشاء القصيدة..."):
                 try:
-                    poet = ArabicPoetryGenerator(api_key)
+                    poet = ArabicPoetryGenerator(anthropic_key=anthropic_key, openai_key=openai_key)
                     success, result = poet.generate_poem(
                         theme=user_prompt.strip(),
                         meter=meter,
                         num_verses=num_verses,
-                        style=style
+                        style=style,
+                        api_provider=api_provider
                     )
                     
                     if success:
                         st.markdown("### 📜 القصيدة:")
+                        # Show which API was used
+                        provider_name = "Anthropic (Claude)" if api_provider == "anthropic" else "OpenAI (GPT)"
+                        st.info(f"🤖 تم إنشاؤها باستخدام: {provider_name}")
+                        
                         # Display poem in a beautiful container
                         st.markdown(
                             f"""
@@ -186,7 +226,7 @@ if api_key_available:
             st.warning("⚠️ يرجى إدخال موضوع للقصيدة")
 
 else:
-    st.info("⚠️ التطبيق غير جاهز - يرجى إعداد مفتاح API")
+    st.info("⚠️ التطبيق غير جاهز - يرجى إعداد مفتاح API واحد على الأقل")
 
 # Footer
 st.markdown("---")
