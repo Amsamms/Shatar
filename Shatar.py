@@ -138,7 +138,7 @@ if api_keys_available:
     # User input
     user_prompt = st.text_area(
         "اكتب موضوع القصيدة:",
-        placeholder="مثال: الحب، الطبيعة، الوطن، الصداقة...",
+        placeholder=" مثال:  الوطن، الصداقة...",
         height=100
     )
     
